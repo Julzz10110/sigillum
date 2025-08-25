@@ -41,7 +41,7 @@ To provide proof of document existence at a specific point in time and guarantee
 ```bash
 # Clone repository
 git clone <repository-url>
-cd notary-system
+cd sigillum
 
 # Build project
 cargo build --release
