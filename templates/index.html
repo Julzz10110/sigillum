@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sigillum - Document Verification</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="file"], input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #3498db;
+        }
+        .success {
+            border-left-color: #27ae60;
+            background-color: #d4edda;
+        }
+        .error {
+            border-left-color: #e74c3c;
+            background-color: #f8d7da;
+        }
+        .hash {
+            font-family: monospace;
+            word-break: break-all;
+            background-color: #f1f1f1;
+            padding: 5px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Sigillum</h1>
+        <p>Verify document authenticity using blockchain technology</p>
+
+        <!-- Upload Section -->
+        <div class="section">
+            <h2>Upload Document</h2>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="document">Select document:</label>
+                    <input type="file" id="document" name="document" required>
+                </div>
+                <button type="submit">Upload and Notarize</button>
+            </form>
+            <div id="uploadResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Verify Section -->
+        <div class="section">
+            <h2>Verify Document</h2>
+            <form id="verifyForm">
+                <div class="form-group">
+                    <label for="documentHash">Document Hash:</label>
+                    <input type="text" id="documentHash" name="documentHash" 
+                           placeholder="Enter document hash to verify" required>
+                </div>
+                <button type="submit">Verify</button>
+            </form>
+            <div id="verifyResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Blockchain Info -->
+        <div class="section">
+            <h2>Blockchain Status</h2>
+            <p>Total blocks: {{ blocks_count }}</p>
+            <p>Pending documents: {{ pending_documents }}</p>
+            <button onclick="mineBlock()">Mine Block</button>
+        </div>
+    </div>
+
+    <script>
+        // Upload form handling
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData();
+            const fileInput = document.getElementById('document');
+            
+            if (fileInput.files.length === 0) {
+                alert('Please select a file');
+                return;
+            }
+
+            formData.append('document', fileInput.files[0]);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                const resultDiv = document.getElementById('uploadResult');
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <strong>Document notarized successfully!</strong><br>
+                        <strong>Filename:</strong> ${result.filename}<br>
+                        <strong>Hash:</strong> <span class="hash">${result.hash}</span><br>
+                        <strong>Document ID:</strong> ${result.id}<br>
+                        <strong>Timestamp:</strong> ${new Date(result.timestamp * 1000).toLocaleString()}
+                    `;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `<strong>Error:</strong> ${result.error}`;
+                }
+                resultDiv.style.display = 'block';
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        });
+
+        // Verify form handling
+        document.getElementById('verifyForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const hash = document.getElementById('documentHash').value.trim();
+            
+            if (!hash) {
+                alert('Please enter a document hash');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/verify/${hash}`);
+                const result = await response.json();
+                const resultDiv = document.getElementById('verifyResult');
+                
+                if (response.ok) {
+                    if (result.exists) {
+                        resultDiv.className = 'result success';
+                        resultDiv.innerHTML = `
+                            <strong>✅ Document verified!</strong><br>
+                            <strong>Block:</strong> ${result.block_index}<br>
+                            <strong>Timestamp:</strong> ${new Date(result.timestamp * 1000).toLocaleString()}<br>
+                            <strong>Merkle Proof:</strong> Available (${result.merkle_proof.length} steps)
+                        `;
+                    } else {
+                        resultDiv.className = 'result error';
+                        resultDiv.innerHTML = '<strong>❌ Document not found in blockchain</strong>';
+                    }
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `<strong>Error:</strong> ${result.error}`;
+                }
+                resultDiv.style.display = 'block';
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        });
+
+        async function mineBlock() {
+            try {
+                const response = await fetch('/mine', { method: 'POST' });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert(`Block mined successfully! Block index: ${result.index}`);
+                    location.reload();
+                } else {
+                    alert(`Error: ${result.error}`);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
